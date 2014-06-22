@@ -1,0 +1,206 @@
+#!/usr/bin/wish
+# -*-tcl-*-
+#
+# This program is executed by wish, if there is no DISPLAY it will choke.
+#
+# The Onetouch touchscreens don't adapt their output to calibration, so
+# we must save calibration information somewhere...
+
+# The empty cursor
+set empty {#define empty_width 1
+#define empty_height 1
+#define empty_x_hot 0
+#define empty_y_hot 0
+static unsigned char empty_bits[] = {
+   0x00};
+}
+
+
+# A command line argument is compulsory
+set error 0
+  if [llength $argv]!=1 {
+      set error 1
+  } else {
+      if ![string match /dev/* $argv] {
+         set error 1
+      }
+  }
+if $error {
+    puts stderr \
+           "$argv0: Need a touchscreen device like /dev/ttyS0"
+    exit 1
+}
+
+proc which cmd {
+    global env
+    foreach n [split $env(PATH) :] {
+        if [file executable $n/$cmd] {return $n/$cmd}
+    }
+    # Look in the current directory too
+    if [file executable ./$cmd] {return ./$cmd}
+    error "$cmd: no such command"
+}
+set prg1 "onetouch_control"
+set prg2 "onetouch_to_ascii"
+
+if {[catch {set p1 [which $prg1]}] || [catch {set p2 [which $prg2]}]} {
+    puts stderr "$prg1 and $prg2  must be in your command search path or in ./"
+    exit 1
+}
+
+# Set useful info
+set datafile "/etc/onetouch/onetouch.calib"
+exec mkdir -p /etc/onetouch
+set nocursor [exec mktemp /tmp/nocursor.XXXXXX]
+set rawdevice $argv
+set cfgdevice $argv
+
+# create a no-cursor file
+set F [open $nocursor w]; puts $F $empty; close $F
+
+puts "Calibration program for serial-port Onetouch touch-screens"
+
+# check generic permission
+set who [exec whoami]
+if [string compare root root] {
+    puts stderr "$argv0: You must be root to be able to run this program"
+    exit 1
+}
+
+# check if we can access this file -- we should, as we created it
+if [catch {set F [open $datafile a]} err] {
+    puts stderr "$argv0: Can't open $datafile: $err"
+    exit 1
+}
+close $F
+
+# an abort procedure, and one to read touchscreen data
+proc do_abort {msg} {
+    global D mode p1
+    wm withdraw .
+    puts stderr $msg
+    catch {close $D}
+    #exec $p1 on
+    exit 1
+}
+
+proc get_position file {
+
+    while 1 {
+	gets $file string
+	if ![string compare $string "up"] {
+	    if {$sx && $sy} {return "$sx $sy"} else {continue}
+	}
+	# If a touch event, save it
+	scan $string "%i %i" sx sy
+    }
+}
+
+
+wm withdraw .
+
+set wid [winfo screenwidth .]
+set hei [winfo screenheight .]
+set hx [expr $wid/2]
+set hy [expr $hei/2]
+wm positionfrom . program
+wm overrideredirect . 1
+
+pack [canvas .c -width $wid -height $hei]
+wm geometry . ${wid}x${hei}+0+0
+
+wm deiconify .
+
+# calibration points, in mils, with y increasing upwards.
+# the values are agreed-upon with other programs in the package,
+# you can change the number of points (but minimum is 3), not the position.
+set points {
+    {125 875}
+    {875 125}
+    {125 125}
+    {875 875}
+    {500 300}
+}
+
+
+message .l -width [expr $wid/3]  -justify center -relief ridge
+
+.c create window $hx $hy -anchor n -window .l
+
+proc target {milsx milsy name color} {
+    global wid hei
+
+    set x [expr $wid * $milsx / 1000]
+    set y [expr $hei * $milsy / 1000]
+    set l [expr $hei/16]
+    set r [expr $l/2]
+    .c create oval [expr $x-$r] [expr $y-$r] [expr $x+$r] [expr $y+$r] \
+	    -tag "o$name o" -outline $color -width 3
+    .c create line [expr $x-$l] $y [expr $x+$l] $y \
+	    -tag "l$name l" -fill $color
+    .c create line $x [expr $y-$l] $x [expr $y+$l] \
+	    -tag "l$name l" -fill $color
+}
+proc targetcolor {color} {
+    .c itemconfig l -fill $color 
+    .c itemconfig o -outline $color
+    update
+}
+proc onetargetcolor {name color} {
+    .c itemconfig l$name -fill $color 
+    .c itemconfig o$name -outline $color
+    update
+}
+
+
+set nocolor [.c cget -background]
+
+set tnum 0
+foreach p $points {
+    foreach {x y} $p {target $x $y t$tnum $nocolor; incr tnum}
+}
+
+.l config -text {
+    Please touch the five targets
+    one at a time, in the suggested order.
+}
+update
+#after 1500
+targetcolor gray
+#after 500
+#targetcolor $nocolor
+after 1500
+
+exec $prg1 off
+.c config -cursor "@$nocursor black"; update
+file delete $nocursor
+set D [open "|$p2 $rawdevice" r]
+fconfigure $D -buffering line
+
+foreach n {t0 t1 t2 t3 t4} {
+    onetargetcolor $n red
+    set c($n) [get_position $D]
+    onetargetcolor $n green
+    after 300
+    onetargetcolor $n $nocolor
+    #puts $c($n)
+}
+exec $p1 on
+
+# Now save the coordinates
+set F [open $datafile w]
+puts $F "# Calibration coordinates for Onetouch device"
+foreach n {t0 t1 t2 t3 t4} {
+    puts $F $c($n)
+}
+close $F
+
+after 200
+.l config -text "Calibration complete.\nClick the touchscreen again"
+update
+catch {close $D}; # that late, as close block until data is written
+update
+bind all <Any-KeyPress> exit
+bind all <1> exit
+vwait forever
+

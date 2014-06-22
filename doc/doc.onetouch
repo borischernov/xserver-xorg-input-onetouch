@@ -1,0 +1,440 @@
+\input texinfo    @c -*-texinfo-*-
+%
+% doc.onetouch - main file for onetouch' documentation
+%
+%%%%
+
+%------------------------------------------------------------------------------
+%
+%                         NOTE FOR THE UNAWARE USER
+%                         =========================
+%
+%    This file is a texinfo source. It isn't the binary file of some strange
+%    editor of mine. If you want ASCII, you should "make onetouchdoc.txt".
+%
+%------------------------------------------------------------------------------
+
+%
+% This is not a conventional texinfo file...
+% I use two extra features:
+%       - The '%' as a comment marker (to preserve in col. 0 use  "\%")
+%       - leading blanks are allowed
+%
+
+@c %**start of header
+@setfilename onetouch.info
+@settitle Onetouch 
+@setchapternewpage off
+@finalout
+@c %**end of header
+
+@set version 1.2              @c VERSION
+@set update-month April 2003   @c VERSION
+
+@ifinfo
+
+This is the documentation for Onetouch-@value{version}.
+Copyright @copyright{} 2001,2003 Alessandro Rubini <rubini@@linux.it>
+
+@end ifinfo
+
+
+@titlepage
+
+@title Onetouch @value{version}
+@subtitle Support software for Onetouch touch screens
+@subtitle @value{update-month}
+
+@author by Alessandro Rubini (@code{rubini@@linux.it})
+@end titlepage
+
+@headings single
+
+@ifnottex
+@c ###################################################################
+@c ###################################################################
+@node Top, General Information, (dir), (dir)
+@top
+This file documents Onetouch, support software for Onetouch touch panels
+under Linux and XFree86.
+
+@menu
+* General Information::         
+* Device Support::              
+* XFree Configuration::         
+* Calibration::                 
+* Support Tools::               
+@end menu
+
+@end ifnottex
+
+@c ###################################################################
+@node General Information, Device Support, Top, Top
+@chapter General Information
+
+The package supports serial Onetouch touch panels under GNU/Linux and
+XFree86.  The latest version of this driver can be downloaded from:
+
+@itemize
+@item
+	@uref{ftp://ftp.gnudd.com/pub/onetouch}
+@item
+	@uref{http://www.gnudd.com/software/#onetouch}
+@end itemize
+
+The latest source tree can be accessed from my CVS server, instructions
+are available at @w{@uref{http://www.gnudd.com/software/#cvs} .}  The
+package name to use is @code{onetouch}. As an alternative, you can use
+@var{viewcvs} at @uref{http://cvs.gnudd.com}.  The latest CVS snapshot
+can also be downloaded from @w{@uref{ftp://ftp.gnudd.com/pub/onetouch}}
+or the mirror site @w{@uref{ftp://ftp.linux.it/pub/People/rubini/onetouch}} .
+
+@c ###################################################################
+@node Device Support, XFree Configuration, General Information, Top
+@chapter Device Support
+
+The driver has been designed to run under XFree86 version 4.x. It
+has been tested on 4.1 and 4.2.
+
+In order  to use  the touch screen  in X,  you should install  in your
+system  the "onetouch_drv" module, part of this distribution.
+
+The compiled  module (@file{onetouch_drv.o}) should  be
+copied in  the module
+directory of  your  X server, usually or @file{/usr/X11R6/lib/modules/input}.
+When  the file is in place, a proper @file{XF86Config} will arrange for
+its loading.  
+
+In order to  recompile the module
+you need access to the complete X source tree, and you can
+compiling issuing:
+
+@example
+	make XFREE_SOURCE=<location-of-source> onetouch_drv.o
+@end example
+
+The "location  of source" above  should be the  full path name  to the
+directory called "xc" after you uncompress the source tar file.
+
+@code{XFREE_SOURCE} can be defined
+in your environment if you prefer. Note that if the variable
+is defined, calling @var{make} without arguments will
+compile the module.
+
+To compile @var{onetouch} you'll most likely need to compile X first
+(by issuing @code{make World} and waiting a huge lot of time). A freshly
+uncompressed source tree lacks the proper header files for compilation
+to succeed; since one of the errors happens inside an X header, you
+can only fix it by compiling X first -- I can't fix things in my source.
+
+@c ########################################################################
+@node XFree Configuration, Calibration, Device Support, Top
+@chapter XFree Configuration
+
+@menu
+* XFree 4.x::                   
+* Generic X Configuration::     
+@end menu
+
+@c ==========================================================================
+@node XFree 4.x, Generic X Configuration, XFree Configuration, XFree Configuration
+@section XFree 4.x
+
+In order  to use a  Onetouch device  with XFree 4,  you need to  add an
+@code{InputDevice}
+ section to your @file{XF86Config}. The following example shows
+how it looks like. The options that are shown commented are not
+implemented in this version of the module, and are ignored
+if specified.
+
+@example
+        Section "InputDevice"
+           Identifier "Touchscreen0"
+           Driver "onetouch"
+           Option "Device"            "/dev/ttyS0"
+	   Option "BaudRate"          "9600"
+	   #Option "CalibrationFile"  "/etc/onetouch.calib"
+	   Option "Smoothness"        "9"
+	   Option "TappingDelay"      "0"
+           Option "JitterDelay"       "50"
+	   Option "DebugLevel"        "0"
+	   Option "SendCoreEvents"  
+        EndSection
+@end example
+@noindent
+Moreover, you need to add an @code{InputDevice} line in the
+@code{ServerLayout} section. After the addition,
+the section will most likely look like this:
+
+@example
+        Section "ServerLayout"
+           Identifier  "Simple Layout"
+           Screen      "Screen 1"
+           InputDevice "Mouse1" "CorePointer"
+           InputDevice "Keyboard1" "CoreKeyboard"
+           InputDevice "Touchscreen0"
+        EndSection
+@end example
+@noindent
+Note that if your system has no mouse device, you can remove
+the @code{InputDevice "Mouse1"} line and add @code{"CorePointer"}
+to the touch screen line.
+
+The meaning of individual options is as follows:
+
+@table @code
+
+@item  Identifier "Touchscreen0"
+
+	The identifier string is mandatory, and appears, literally, in
+        the @code{InputDevice} directive within the @code{ServerLayout}
+        section that is usually found at the end of the configuration file.
+
+@item  Driver "onetouch"
+
+	The name of the driver is mandatory. It is used to load the
+        associated module.  In this case the file @file{onetouch_drv.o}.
+
+@item Option "Device" "/dev/ttyS0"
+
+	The device name is mandatory. It states where input data is
+        collected from.
+
+@item Option "BaudRate" "9600"
+
+	The transmission rate for serial ports. It defaults to 9600.
+
+@item Option "CalibrationFile" "/etc/onetouch.calib"
+
+	The option is not currently implemented, the calibration
+        filename is hardwired
+
+@item Option "Smoothness"       "9"
+
+	The smoothness of the pointer. The default value is 9. The greater
+        the value the smoother the motion. If you need to do handwriting
+        or similar "fast" interaction, you should set the smoothness to 0.
+
+@item Option "TappingDelay"          "0"
+
+	Optional  selection of  tapping mode.
+        By  default (tapping delay set to 0), any  touch
+	event is reported as a button press. In tapping mode the first
+	touch event is used to  move the pointer, and button press is
+	only reported when  the user taps on the  device. If the delay,
+        measured in milliseconds, between pen-up and pen-down is greater
+        than the selected value, the pen-down even is considered motion.
+        I personally
+	prefer tapping mode  when testing the device, as  it allows me
+	to  use  the   common  point-and-click  semantics  instead  of
+	click-only; this is especially true if your touchscreen is not
+        placed over the image but in side of it (as you guess, I do that).
+
+@item Option "JitterDelay"          "50"
+
+	The debouncing time lapse, measured in milliseconds.
+        If a pen-down event occurs immediately after pen-up (within this
+        time lapse), then both events are discarded. Debouncing has
+        been contributed by Chris Howe <chris@@howeville.com>, and defaults
+        to 50ms.
+
+@item Option "DebugLevel" "0"
+
+	The level of messages spit out by the driver. The directive
+        is optional and it defaults to 0.
+
+@item Option "SendCoreEvents"  
+
+	The directive instructs X to use the touch screen as a core
+        input device (like the main mouse). This module can currently
+        only work as a core device.
+
+@end table
+
+@c ==========================================================================
+@node Generic X Configuration,  , XFree 4.x, XFree Configuration
+@section Generic X Configuration
+
+Please note that with XFree you can still
+use a  normal mouse together with  the touch panel. Also,
+can use the touch screen as its only pointer device.
+
+If,  when calling  @code{startx}, it  fails with  a message  of
+@code{Invalid Subsection  Name}, please  check the  previous error
+lines,  as they explain what is wrong. They usually look like:
+
+@example
+    (--) no ModulePath specified using default: /usr/X11R6/lib/modules
+    xf86Onetouch.so: Unknown error loading module
+@end example
+
+The messages are pretty clear, if your  are careful in reading them (I am
+not that careful,  and lose half an hour in trying  to figure out what
+was wrong).
+
+@c ########################################################################
+@node Calibration, Support Tools, XFree Configuration, Top
+@chapter Calibration
+
+To calibrate the touch panel, run the @file{onetouch_calib} script, under X.
+
+The program needs  to find @file{onetouch_control} and
+@file{onetouch_to_ascii} in the  command search path or the current
+directory. This usually means you can simply ``@code{make install}''
+before running the calibration, but you can also run the calibration
+program from the source directory, provided ``@code{.}'' is in your
+@code{PATH}.
+
+The control program is used to turn off the touchscreen in X, so the
+calibrator can read input data (@pxref{onetouch_control}). The
+conversion tool is used so that the calibrator can read
+ASCII data instead of binary data (@pxref{onetouch_to_ascii}).
+
+The new 5-point calibration, as of release 1.2 of the package, is a
+full-screen application that takes complete control of your
+desktop. Since it disables the touchscreen in X in order to directly
+read the serial port, you'll need to invoke ``@code{onetouch_control
+on}'' or ``@code{onetouch_control raw}'' if the program terminates
+unexpectedly.  Premature death of the application is not foreseeable,
+but you may want to send a termination signal to the calibrator for
+whatever reason. @xref{onetouch_control}.
+
+@menu
+* Support Tools::               
+@end menu
+
+@c ########################################################################
+@node Support Tools,  , Calibration, Top
+@chapter Support Tools
+
+The package includes three tools that work by connecting with the X server:
+
+@menu
+* onetouch_control::            
+* onetouch_panel::              
+* onetouch_to_ascii::           
+* warp::                        
+@end menu
+
+@c ==========================================================================
+@node    onetouch_control, onetouch_panel, Support Tools, Support Tools
+@section onetouch_control
+
+The program receives a single command-line argument and uses it as
+a command to be performed by communicating with the X server.
+
+The following commands are supported:
+
+@table @code
+
+@item devinfo
+
+	Report device information to standard output. The information is
+        about the input devices active in the current X server. In order
+        for the other commands to succeed, the server must have exactly one
+        touch panel configured. @xref{XFree Configuration}.
+
+@item off
+
+	Deactivate the input device. The command makes the driver stop
+        reading the serial port, so the calibration program (or
+        otherwise) can read touchscreen data.
+
+@item on
+
+	Activate the input device. The command tells the driver to start
+        reading the serial port again and activate the current calibration.
+        If no calibration file is found the touchscreen will work in raw mode.
+
+@item raw
+
+	Activate the input device in raw mode. Even if a calibration file
+        exists, it will not be used until the @var{on} command is issued.
+        The command is meant to stop using wrong calibration information
+        that sometimes may be generated by error.
+
+@item b1
+
+	Generate button-1 press and release events (the default).
+
+@item b2
+@itemx b3
+
+	Generate button-2 (middle button) events from now on, likewise
+        for button-3 (right button).
+
+@item b2once
+@itemx b3once
+
+	Generate a button-2 event for the next press and release events,
+        and then turn back to reporting button-1 events. The program
+        won't terminate until the button-2 events have been reported.
+        Likewise for button-3.
+
+@item getleds
+
+	Return to standard output information about the current status
+        of device leds. There are no physical leds on the touchscreen device,
+        but the "led" abstraction is what has been used to send commands
+        to the driver. This command is useful to me but very unlikely to
+        be useful to anyone else.
+
+@end table
+
+@c ==========================================================================
+@node    onetouch_panel, onetouch_to_ascii, onetouch_control, Support Tools
+@section onetouch_panel
+
+The program is a simple graphical application to control generation of
+button-2 and button-3 mouse events. Running the application is optional,
+and you won't need to run it if your setup only uses button-1 events.
+
+The program window is made up of two buttons, labelled ``2'' and ``3''.
+They are inactive by default.
+
+After clicking on one of the buttons, it becomes yellow and the touch
+screen will report a button-2 or button-3 event once. After the event is
+reported the button turns back gray and the touchscreen will go back to
+report button-1 events.
+
+After clicking twice on one of the buttons, the button becomes red and
+button-2 or button-3 events will be generated from now on. To go back to
+button-1 events just click on the button again to inactivate it.
+
+@c ==========================================================================
+@node    onetouch_to_ascii, warp, onetouch_panel, Support Tools
+@section onetouch_to_ascii
+
+The program reads from the serial port specified on the command-line and
+converts binary packet to ascii information. Besides being used by the
+calibration program, the program can be used for basic diagnosis of
+hardware problems.
+
+@c ==========================================================================
+@node    warp,  , onetouch_to_ascii, Support Tools
+@section warp
+
+The program moves  the mouse pointer.  It can  be used to move
+the mouse when  there is no active mouse.  It accepts a series
+of  letters on the  command line:  each uppercase  N, S,  W, E
+moves the  pointer by  100 pixels to  the north,  south, west,
+east.  Each lowercase  n,  s, w,  e  moves the  pointer by  10
+pixels.
+
+
+@c @node Concept Index,  , Usb Driver, Top
+@c @unnumbered Concept Index
+@c @printindex cp
+
+@contents
+@bye
+
+@c Local Variables:
+@c mode:texinfo
+@c mode:flyspell
+@c mode:font-lock
+@c ispell-extra-args:("-W" "3")
+@c End:
+
+@c  LocalWords:  onetouch ascii touchscreen XFree texinfo rubini Alessandro
+@c  LocalWords:  linux gnudd leds

@@ -1,0 +1,54 @@
+
+onetouch: onetouch driver for Xorg 1.13 and up
+
+Prerequisites:
+-----------------------------------------------
+
+To compile on Ubuntu install the required packages:
+
+sudo apt-get install xserver-xorg-dev xutils-dev libxi-dev x11proto-core-dev
+
+To be able to run calibration script install tk:
+
+sudo apt-get install tk
+
+
+
+Installation:
+-----------------------------------------------
+
+./configure --with-xorg-module-dir=/usr/lib/xorg/modules
+make 
+make install
+
+
+
+Configuration
+-----------------------------------------------
+
+Add the following section to xorg.conf (or a file in xorg.conf.d):
+
+Section "InputDevice"
+    Identifier     "Touchscreen"
+    Driver         "onetouch"
+    Option         "DeviceName" "Onetouch Touchscreen"
+    Option         "Device" "/dev/ttyUSB0"		# Change this to match the actual device name
+    Option         "BaudRate" "9600"
+    Option         "DebugLevel" "0"			 
+    Option         "Smoothness" "10"			# This changes the number of points over which the coordinates are averaged; 0 to switch off
+    Option	   "DisableDrag" "0"			# Change this to 1 to disable drag
+    Option         "SendCoreEvents"
+    Option	   "CorePointer" 
+EndSection
+
+
+
+Calibration
+-----------------------------------------------
+
+Calibration data is stored in /etc/onetouch/onetouch.calib
+To start calibration:
+
+onetouch_calib /dev/ttyUSB0		# cgange the device name as appropriate
+
+

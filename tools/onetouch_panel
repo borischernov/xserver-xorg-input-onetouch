@@ -1,0 +1,84 @@
+#!/usr/bin/wish
+# -*-tcl-*-
+# This program is executed by wish, if there is no DISPLAY it will choke.
+#
+# Copyright (c) 2003 Alessandro Rubini <rubini@linux.it>
+#
+
+wm withdraw .
+#wm overrideredirect . 1
+
+proc which cmd {
+    global env
+    foreach n [split $env(PATH) :] {
+        if [file executable $n/$cmd] {return $n/$cmd}
+    }
+    error "$cmd: no such command"
+}
+if {[catch {which onetouch_control}]} {
+    puts stderr "onetouch_control must be in your command search path"
+    exit 1
+}
+
+
+# the "status" array
+set s(2) [set s(3) 0]
+
+# colors for the three states
+set colors "#c0c0c0 #d0d080 #d08080"
+
+proc lowact {button status} {
+    global s colors
+    set color [lindex $colors $status]
+    .b$button config -background $color -activebackground $color
+    update
+    switch $status {
+	0  {exec onetouch_control b1}
+	2  {exec onetouch_control b${button}}
+	1  {
+	    # the once thing is more difficult; let it raw by now
+	    exec onetouch_control b${button}once
+	    update
+	    # if we haven't changed, then go to status 0
+	    if $s($button)==1 {
+		set s($button) 0
+		lowact $button 0
+	    }
+	} 
+    }
+}
+
+proc act {b} {
+    global s
+    set c [expr 5 - $b] ; # b is button, c is other button
+
+    incr s($b)
+    if {$s($b) > 2} {
+	set s($b) 0
+    } else {
+	set s($c) 0
+	lowact $c 0
+    }
+    lowact $b $s($b)
+}
+
+foreach n {2 3} {
+    pack [button .b$n -font 10x20 -text $n -command "" \
+	    -relief ridge] -side left
+    bind .b$n <ButtonPress-1> "break"
+    bind .b$n <ButtonPress-2> "break"
+    bind .b$n <ButtonPress-3> "break"
+    bind .b$n <ButtonRelease-1> "act $n; break"
+    bind .b$n <ButtonRelease-2> "act $n; break"
+    bind .b$n <ButtonRelease-3> "act $n; break"
+    # Poor's man autoraise
+    #bind .b$n <Visibility> "raise .; update"
+}
+
+
+
+exec onetouch_control b1
+
+# title and map to screen
+wm title . "OneTouch Panel"
+wm deiconify .
